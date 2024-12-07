@@ -1,15 +1,12 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
-using Microsoft.ML.Data;
 using Microsoft.ML;
+using Microsoft.ML.Data;
 using Microsoft.Win32;
 using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Windows;
-using System.Security.Cryptography;
-using System.Windows.Controls.Primitives;
-using System.Windows.Controls;
 
 namespace AutoSale
 {
@@ -52,79 +49,95 @@ namespace AutoSale
 
         private void BtnLoadData_Click(object sender, RoutedEventArgs e)
         {
-            var openFileDialog = new OpenFileDialog
+            try
             {
-                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                Title = "Select Auto Sales Data File"
-            };
+                var openFileDialog = new OpenFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    Title = "Select Auto Sales Data File"
+                };
 
-            if (openFileDialog.ShowDialog() == true)
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    string filePath = openFileDialog.FileName;
+                    var data = LoadCsv(filePath);
+                    DataGridView.ItemsSource = data.DefaultView;
+                }
+            }
+            catch (Exception ex)
             {
-                string filePath = openFileDialog.FileName;
-                var data = LoadCsv(filePath);
-                DataGridView.ItemsSource = data.DefaultView;
+                LogError(ex);
+                MessageBox.Show(ex.Message);
             }
         }
 
         private void BtnCleanData_Click(object sender, RoutedEventArgs e)
         {
-            var data = ((DataView)DataGridView.ItemsSource)?.Table;
-
-            if (data == null)
+            try
             {
-                MessageBox.Show("No data to clean.");
-                return;
-            }
+                var data = ((DataView)DataGridView.ItemsSource)?.Table;
 
-            foreach (DataColumn column in data.Columns)
-            {
-                if (column.DataType == typeof(double) || column.DataType == typeof(int))
+                if (data == null)
                 {
-                    var avg = data.AsEnumerable()
-                                  .Where(row => !row.IsNull(column))
-                                  .Average(row => Convert.ToDouble(row[column]));
-                    foreach (DataRow row in data.Rows)
+                    MessageBox.Show("No data to clean.");
+                    return;
+                }
+
+                foreach (DataColumn column in data.Columns)
+                {
+                    if (column.DataType == typeof(double) || column.DataType == typeof(int))
                     {
-                        if (row.IsNull(column))
+                        var avg = data.AsEnumerable()
+                                      .Where(row => !row.IsNull(column))
+                                      .Average(row => Convert.ToDouble(row[column]));
+                        foreach (DataRow row in data.Rows)
                         {
-                            row[column] = avg;
+                            if (row.IsNull(column))
+                            {
+                                row[column] = avg;
+                            }
+                        }
+
+                        var values = data.AsEnumerable()
+                                         .Where(row => !row.IsNull(column))
+                                         .Select(row => Convert.ToDouble(row[column]))
+                                         .ToList();
+
+                        double mean = values.Average();
+                        double stdDev = Math.Sqrt(values.Average(v => Math.Pow(v - mean, 2)));
+
+                        foreach (DataRow row in data.Rows)
+                        {
+                            if (!row.IsNull(column))
+                            {
+                                double zScore = Math.Abs((Convert.ToDouble(row[column]) - mean) / stdDev);
+                                if (zScore > 3)
+                                {
+                                    row[column] = mean;
+                                }
+                            }
                         }
                     }
-
-                    var values = data.AsEnumerable()
-                                     .Where(row => !row.IsNull(column))
-                                     .Select(row => Convert.ToDouble(row[column]))
-                                     .ToList();
-
-                    double mean = values.Average();
-                    double stdDev = Math.Sqrt(values.Average(v => Math.Pow(v - mean, 2)));
-
-                    foreach (DataRow row in data.Rows)
+                    else if (column.DataType == typeof(string))
                     {
-                        if (!row.IsNull(column))
+                        foreach (DataRow row in data.Rows)
                         {
-                            double zScore = Math.Abs((Convert.ToDouble(row[column]) - mean) / stdDev);
-                            if (zScore > 3)
+                            if (row.IsNull(column))
                             {
-                                row[column] = mean;
+                                row[column] = "Unknown";
                             }
                         }
                     }
                 }
-                else if (column.DataType == typeof(string))
-                {
-                    foreach (DataRow row in data.Rows)
-                    {
-                        if (row.IsNull(column))
-                        {
-                            row[column] = "Unknown";
-                        }
-                    }
-                }
-            }
 
-            DataGridView.ItemsSource = data.DefaultView;
-            MessageBox.Show("Data cleaning complete.");
+                DataGridView.ItemsSource = data.DefaultView;
+                MessageBox.Show("Data cleaning complete.");
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show(ex.Message);
+            }
         }
 
         private string DescribeData(DataTable data)
@@ -244,28 +257,36 @@ namespace AutoSale
 
         private void BtnAnalyzeRFM_Click(object sender, RoutedEventArgs e)
         {
-            var data = ((DataView)DataGridView.ItemsSource)?.Table;
-
-            if (data == null)
+            try
             {
-                MessageBox.Show("No data loaded.");
-                return;
-            }
+                var data = ((DataView)DataGridView.ItemsSource)?.Table;
 
-            data = CalculateRFM(data);
-            AssignQuartileScores(data);
-            var rfmColumn = "RFM_Segment";
-            data.Columns.Add(rfmColumn, typeof(string));
-            foreach (DataRow row in data.Rows)
+                if (data == null)
+                {
+                    MessageBox.Show("No data loaded.");
+                    return;
+                }
+
+                data = CalculateRFM(data);
+                AssignQuartileScores(data);
+                var rfmColumn = "RFM_Segment";
+                data.Columns.Add(rfmColumn, typeof(string));
+                foreach (DataRow row in data.Rows)
+                {
+                    var rScore = Convert.ToInt32(row["Recency_Score"]);
+                    var fScore = Convert.ToInt32(row["Frequency_Score"]);
+                    var mScore = Convert.ToInt32(row["Monetary_Score"]);
+                    row[rfmColumn] = $"{rScore}{fScore}{mScore}";
+                }
+
+                DataGridView.ItemsSource = data.DefaultView;
+                MessageBox.Show("RFM Analysis Complete.");
+            }
+            catch (Exception ex)
             {
-                var rScore = Convert.ToInt32(row["Recency_Score"]);
-                var fScore = Convert.ToInt32(row["Frequency_Score"]);
-                var mScore = Convert.ToInt32(row["Monetary_Score"]);
-                row[rfmColumn] = $"{rScore}{fScore}{mScore}";
+                LogError(ex);
+                MessageBox.Show(ex.Message);
             }
-
-            DataGridView.ItemsSource = data.DefaultView;
-            MessageBox.Show("RFM Analysis Complete.");
         }
 
         private void PerformKMeansClustering(DataTable data, int numberOfClusters)
@@ -311,20 +332,43 @@ namespace AutoSale
 
         private void BtnKMeans_Click(object sender, RoutedEventArgs e)
         {
-            var data = ((DataView)DataGridView.ItemsSource)?.Table;
-
-            if (data == null)
+            try
             {
-                MessageBox.Show("No data loaded.");
-                return;
-            }
+                var data = ((DataView)DataGridView.ItemsSource)?.Table;
 
-            if (!data.Columns.Contains("Recency") || !data.Columns.Contains("Frequency") || !data.Columns.Contains("Monetary"))
+                if (data == null)
+                {
+                    MessageBox.Show("No data loaded.");
+                    return;
+                }
+
+                if (!data.Columns.Contains("Recency") || !data.Columns.Contains("Frequency") || !data.Columns.Contains("Monetary"))
+                {
+                    data = CalculateRFM(data);
+                }
+
+                PerformKMeansClustering(data, numberOfClusters: 3);
+            }
+            catch (Exception ex)
             {
-                data = CalculateRFM(data);
+                LogError(ex);
+                MessageBox.Show(ex.Message);
             }
+        }
 
-            PerformKMeansClustering(data, numberOfClusters: 3);
+        private void LogError(Exception ex)
+        {
+            try
+            {
+                string logFileName = $"log_{DateTime.Now:ddMMyyyy}.txt";
+                string logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, logFileName);
+                string logContent = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex.Message}\n{ex.StackTrace}\n";
+
+                File.AppendAllText(logFilePath, logContent);
+            }
+            catch
+            {
+            }
         }
     }
 }
