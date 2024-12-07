@@ -1,0 +1,18 @@
+﻿<Window x:Class="AutoSale.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AutoSale"
+        mc:Ignorable="d"
+        WindowStartupLocation="CenterScreen"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <DataGrid x:Name="DataGridView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="10,10,10,50"/>
+        <Button x:Name="BtnLoadData" Content="Load Data" Width="100" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="10,0,0,10" Click="BtnLoadData_Click"/>
+        <Button x:Name="BtnCleanData" Content="Clean Data" Width="100" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="120,0,0,10" Click="BtnCleanData_Click"/>
+        <Button x:Name="BtnAnalyzeData" Content="Analyze" Width="100" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="230,0,0,10" Click="BtnAnalyzeData_Click"/>
+        <Button x:Name="BtnAnalyzeRFM" Content="Analyze RFM" Width="100" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="340,0,0,10" Click="BtnAnalyzeRFM_Click"/>
+        <Button x:Name="BtnKMeans" Content="K-means Clustering" Width="150" Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="450,0,0,10" Click="BtnKMeans_Click"/>
+    </Grid>
+</Window>
